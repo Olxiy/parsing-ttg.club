@@ -12,50 +12,46 @@ export class BestiaryController {
     const arrayBestiaryInfo = [];
     const arrayBestiaryFVTT = [];
     let counter = 0;
-    try {
-      const fillListBestiary = await firstValueFrom(
-        this.bestiaryService.fillListBestiary(),
-      );
 
-      if (
-        fillListBestiary &&
-        fillListBestiary.data &&
-        fillListBestiary.data.length
-      ) {
+    try {
+      const fillListBestiary = await firstValueFrom(this.bestiaryService.fillListBestiary());
+
+      if (fillListBestiary?.data?.length) {
         for (const item of fillListBestiary.data) {
           await delay(100);
           counter++;
-
           console.log('Processing:', item.url);
           console.log('Left data:', fillListBestiary.data.length - counter);
 
-          const bestiaryData = await firstValueFrom(
-            this.bestiaryService.getSelectedBestiaryInfo(item.url),
-          );
-
+          const bestiaryData = await firstValueFrom(this.bestiaryService.getBestiaryInfo(item.url));
           arrayBestiaryInfo.push(bestiaryData.data);
 
-          const bestiaryFVTT = await firstValueFrom(
-            this.bestiaryService.getSelectedBestiaryFVTT(
-              bestiaryData?.data?.id,
-              '11',
-            ),
-          );
-          arrayBestiaryFVTT.push(bestiaryFVTT.data);
+          let bestiaryFVTT = null;
+
+          try {
+            bestiaryFVTT = await firstValueFrom(this.bestiaryService.getBestiaryFVTT(bestiaryData?.data?.id, '11'));
+          } catch (error) {
+            console.error(`Error fetching FVTT data with version 11 for ID ${bestiaryData?.data?.id}:`, error);
+            try {
+              bestiaryFVTT = await firstValueFrom(this.bestiaryService.getBestiaryFVTT(bestiaryData?.data?.id, '10'));
+            } catch (error) {
+              console.error(`Error fetching FVTT data with version 10 for ID ${bestiaryData?.data?.id}:`, error);
+              console.log(`Skipping ID ${bestiaryData?.data?.id}`);
+              continue;
+            }
+          }
+
+          if (bestiaryFVTT) {
+            arrayBestiaryFVTT.push(bestiaryFVTT.data);
+          }
         }
 
         if (arrayBestiaryInfo.length) {
-          this.bestiaryService.saveDataToFile(
-            arrayBestiaryInfo,
-            'bestiary.json',
-          );
+          await this.bestiaryService.saveDataToFile(arrayBestiaryInfo, 'bestiary.json');
         }
 
         if (arrayBestiaryFVTT.length) {
-          this.bestiaryService.saveDataToFile(
-            arrayBestiaryInfo,
-            'bestiaryFVTT-V11.json',
-          );
+          await this.bestiaryService.saveDataToFile(arrayBestiaryFVTT, 'bestiaryFVTT-V11.json');
         }
 
         return 'All data processed successfully!';
